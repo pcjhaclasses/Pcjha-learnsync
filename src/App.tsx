@@ -9,17 +9,26 @@ import { LibraryView } from './components/library/LibraryView';
 import { EditorLayout } from './components/editor/EditorLayout';
 import { PresentationView } from './components/presentation/PresentationView';
 import { RecordingView } from './components/recording/RecordingView';
+import { AudioStudioView } from './components/audio/AudioStudioView';
+import { ImportCenterView } from './components/import/ImportCenterView';
+import { LearningView } from './components/learning/LearningView';
 
 const AppContent: React.FC = () => {
   const { view } = useApp();
 
   return (
     <div className="min-h-screen flex flex-col bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 antialiased selection:bg-amber-200 selection:text-stone-900 transition-colors">
-      {/* Standalone Fullscreen Presentation or Recording Mode */}
+      {/* Standalone Fullscreen / Dedicated Views */}
       {view === 'presentation' ? (
         <PresentationView />
       ) : view === 'recording' ? (
         <RecordingView />
+      ) : view === 'audio' || view === 'audioStudio' ? (
+        <AudioStudioView />
+      ) : view === 'import' || view === 'importCenter' ? (
+        <ImportCenterView />
+      ) : view === 'learning' || view === 'reader' ? (
+        <LearningView />
       ) : (
         <>
           <Navbar />

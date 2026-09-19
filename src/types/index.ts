@@ -1,11 +1,31 @@
-// Data Models for PCJha LearnSync
+// Data Models for PCJha LearnSync V2
+
+export interface AudioTiming {
+  wordId: string;
+  text: string;
+  startTime: number; // in seconds
+  endTime: number;   // in seconds
+}
+
+export interface AudioAsset {
+  id: string;
+  name: string;
+  dataUrl?: string; // Base64 or object URL
+  blob?: Blob;      // Raw audio blob stored in IndexedDB
+  duration: number; // in seconds
+  mimeType: string;
+  createdAt: number;
+}
 
 export interface Sentence {
   id: string;
   hindi: string;
-  pronunciation: string; // Hindi pronunciation written in Devanagari script
+  pronunciation: string; // Hindi pronunciation in Devanagari script
   english: string;
   note?: string; // Optional teacher note
+  audioId?: string; // ID referencing local AudioAsset
+  audioTimings?: AudioTiming[]; // Synced word timings
+  wordNotes?: Record<string, string>; // Word-level notes { [wordId]: note }
 }
 
 export interface Lesson {
@@ -14,6 +34,16 @@ export interface Lesson {
   sentences: Sentence[];
   createdAt: number;
   updatedAt: number;
+}
+
+export interface ActivityProgress {
+  chapterId: string;
+  readCompleted: boolean;
+  listenSeconds: number;
+  practiceCount: number;
+  quizScore?: number;
+  quizTotal?: number;
+  lastStudiedAt: number;
 }
 
 export interface Chapter {
@@ -27,6 +57,7 @@ export interface Chapter {
   description?: string;
   coverImage?: string;
   lessons: Lesson[];
+  activityProgress?: ActivityProgress;
   createdAt: number;
   updatedAt: number;
 }
@@ -38,8 +69,54 @@ export interface Course {
   description?: string;
   themeId?: string;
   chapters: Chapter[];
+  schemaVersion?: number;
   createdAt: number;
   updatedAt: number;
+}
+
+// Student Learning Platform Types
+export interface VocabularyItem {
+  id: string;
+  word: string;
+  pronunciation: string;
+  meaning: string;
+  exampleSentence?: string;
+  chapterId?: string;
+  sentenceId?: string;
+  audioId?: string;
+  mastered: boolean;
+  addedAt: number;
+  reviewCount: number;
+}
+
+export interface QuizQuestion {
+  id: string;
+  sentenceId?: string;
+  type: 'multiple-choice' | 'mcq' | 'fillBlank' | 'match' | 'meaning' | 'pronunciation' | 'audio';
+  question: string;
+  options?: string[];
+  correctAnswer: string | number;
+  explanation?: string;
+}
+
+export interface QuizResult {
+  id: string;
+  chapterId: string;
+  lessonId?: string;
+  score: number;
+  totalQuestions: number;
+  completedAt: number;
+  answers: Record<string, string>;
+}
+
+export interface LibraryBook {
+  id: string;
+  title: string;
+  type: 'pdf' | 'docx' | 'image' | 'text';
+  dataUrl?: string;
+  textContent?: string;
+  createdAt: number;
+  bookmarks?: number[];
 }
 
 // Tokenized word unit for rendering
@@ -47,7 +124,7 @@ export interface WordToken {
   id: string;
   index: number;
   text: string; // Displayed text (with preserved punctuation)
-  raw: string;  // Base word without leading/trailing punctuation for analysis
+  raw: string;  // Base word without leading/trailing punctuation
 }
 
 // Presentation Layers & Modes
@@ -70,7 +147,7 @@ export interface TypographyLayerConfig {
   fontSize: number; // in pixels
   fontWeight: number;
   lineHeight: number;
-  letterSpacing: number; // in em or px
+  letterSpacing: number;
 }
 
 export interface TypographyConfig {
@@ -108,10 +185,10 @@ export interface ThemeConfig {
   divider: string;
   // Highlight customization
   highlightStyle: HighlightStyle;
-  highlightOpacity: number; // 0.1 to 1.0
-  highlightBorderRadius: number; // in px
-  highlightPaddingX: number; // in px
-  highlightPaddingY: number; // in px
+  highlightOpacity: number;
+  highlightBorderRadius: number;
+  highlightPaddingX: number;
+  highlightPaddingY: number;
 }
 
 // Presentation & Controls Configuration
@@ -127,6 +204,7 @@ export interface PresentationConfig {
   showPercent: boolean;
   showIntroCover: boolean;
   showCompletionScreen: boolean;
+  showRecordingTimer?: boolean;
   showControlButtons: {
     prev: boolean;
     next: boolean;
@@ -139,17 +217,27 @@ export interface PresentationConfig {
 }
 
 // Recording Configuration
-export type CanvasPreset = '16:9' | '9:16' | '1:1' | '720p' | 'custom';
+export type CanvasPreset = '16:9' | '9:16' | '1:1' | '4:5' | '720p' | 'custom';
+
+export interface VideoCropBounds {
+  x: number; // proportional 0 to 1
+  y: number; // proportional 0 to 1
+  width: number; // proportional 0 to 1
+  height: number; // proportional 0 to 1
+}
 
 export interface RecordingConfig {
   canvasPreset: CanvasPreset;
   customWidth: number;
   customHeight: number;
-  backgroundType: 'theme' | 'solid' | 'image';
+  backgroundType: 'theme' | 'solid' | 'gradient' | 'image';
   customBgColor: string;
+  customBgGradient?: string;
   customBgImage?: string;
+  bgPosition?: 'cover' | 'contain' | 'center';
   showSafeAreaGuides: boolean;
   safeAreaMarginPercent: number;
+  frameRate: number;
 }
 
 // Active Presentation Navigation State
@@ -159,15 +247,27 @@ export interface PresentationState {
   sentenceIndex: number;
   activeLayer: ActiveLayer;
   wordIndex: number;
-  isStarted: boolean;      // True if user has initiated presentation past intro
-  isPlaying: boolean;      // Auto playback active
-  isPaused: boolean;       // Auto playback temporarily paused by user
-  isSectionPaused: boolean;// Inside custom section pause duration
+  isStarted: boolean;
+  isPlaying: boolean;
+  isPaused: boolean;
+  isSectionPaused: boolean;
   currentPauseLabel?: string;
   completedCyclesForSentence: number;
-  isCompleted: boolean;    // Reached the end of the lesson
+  isCompleted: boolean;
 }
 
 // App View Modes
-export type AppView = 'library' | 'editor' | 'presentation' | 'recording';
+export type AppView =
+  | 'library'
+  | 'editor'
+  | 'presentation'
+  | 'recording'
+  | 'audioStudio'
+  | 'audio'
+  | 'importCenter'
+  | 'import'
+  | 'learning'
+  | 'reader'
+  | 'progress';
+
 export type EditorSubTab = 'cards' | 'bulk';

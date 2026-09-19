@@ -2,25 +2,41 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Video,
   Square,
-  Download,
   X,
   HelpCircle,
+  Mic,
+  MicOff,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Pause,
+  RotateCcw,
+  Maximize,
+  Minimize,
+  Clock,
 } from 'lucide-react';
 import { usePresentation } from '../../state/PresentationContext';
 import { useTheme } from '../../state/ThemeContext';
 import { useApp } from '../../state/AppContext';
 import { WordHighlightLayer } from '../presentation/WordHighlight';
 import { ScreenRecorder, type RecorderState } from '../../services/recorder';
-import type { CanvasPreset } from '../../types';
+import { VideoCropModal } from './VideoCropModal';
+import type { CanvasPreset, ControlsVisibility } from '../../types';
 
 export const RecordingView: React.FC = () => {
   const {
     sentenceIndex,
+    isPlaying,
+    isPaused,
+    togglePlayPause,
     nextWord,
     prevWord,
+    restart,
     wakeControls,
     areControlsVisible,
     setIsHelpOpen,
+    presentationConfig,
+    updatePresentationConfigProp,
   } = usePresentation();
 
   const { theme } = useTheme();
@@ -32,13 +48,15 @@ export const RecordingView: React.FC = () => {
     isRecording: false,
     durationSeconds: 0,
     blobUrl: null,
+    recordedBlob: null,
     mimeType: null,
     errorMessage: null,
   });
 
-  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showCropModal, setShowCropModal] = useState<boolean>(false);
   const [canvasPreset, setCanvasPreset] = useState<CanvasPreset>('16:9');
-  const [showSetupGuides, setShowSetupGuides] = useState(false);
+  const [showSetupGuides, setShowSetupGuides] = useState<boolean>(false);
+  const [includeMic, setIncludeMic] = useState<boolean>(true);
 
   const recorderRef = useRef<ScreenRecorder | null>(null);
 
@@ -47,16 +65,25 @@ export const RecordingView: React.FC = () => {
       setRecorderState((prev) => {
         const next = { ...prev, ...update };
         if (update.blobUrl) {
-          setShowCompletionModal(true);
+          setShowCropModal(true);
         }
         return next;
       });
     });
+
+    return () => {
+      if (recorderRef.current) {
+        recorderRef.current.stopRecording();
+      }
+    };
   }, []);
 
   const handleStartRecording = async () => {
     if (recorderRef.current) {
-      await recorderRef.current.startRecording();
+      const ok = await recorderRef.current.startRecording({ includeMic });
+      if (ok) {
+        wakeControls();
+      }
     }
   };
 
@@ -66,21 +93,20 @@ export const RecordingView: React.FC = () => {
     }
   };
 
-  const handleDownloadVideo = () => {
-    if (!recorderState.blobUrl) return;
-    const a = document.createElement('a');
-    a.href = recorderState.blobUrl;
-    const dateStr = new Date().toISOString().slice(0, 10);
-    a.download = `PCJha-LearnSync-Recording-${currentChapter?.title || 'lesson'}-${dateStr}.webm`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
   };
+
+  const isFullscreen = typeof document !== 'undefined' && !!document.fullscreenElement;
 
   const sentences = currentLesson?.sentences || [];
   const currentSentence = sentences[sentenceIndex];
 
-  // Canvas aspect ratio styles
+  // Canvas aspect ratio styles (exact same as previous version)
   let canvasStyle: React.CSSProperties = {
     width: '100%',
     maxWidth: '1200px',
@@ -123,10 +149,10 @@ export const RecordingView: React.FC = () => {
       }}
       className="fixed inset-0 z-50 bg-stone-950 text-white flex flex-col items-center justify-center select-none overflow-hidden"
     >
-      {/* Recording Header Toolbar (Fades out when recording or inactivity) */}
+      {/* Recording Setup Header Toolbar (Visible before recording, hides during recording) */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 transition-opacity duration-300 flex items-center gap-2 px-3 py-2 rounded-2xl bg-stone-900/90 border border-stone-800 backdrop-blur-md shadow-2xl text-xs ${
+        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 transition-opacity duration-300 flex flex-wrap items-center gap-2 px-3.5 py-2 rounded-2xl bg-stone-900/90 border border-stone-800 backdrop-blur-md shadow-2xl text-xs ${
           areControlsVisible && !recorderState.isRecording ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
@@ -164,7 +190,7 @@ export const RecordingView: React.FC = () => {
           </button>
         </div>
 
-        {/* Safe Area Toggle */}
+        {/* Safe Area Guides Toggle */}
         <button
           onClick={() => setShowSetupGuides(!showSetupGuides)}
           className={`px-2 py-1 rounded-lg border text-[11px] transition ${
@@ -172,9 +198,61 @@ export const RecordingView: React.FC = () => {
               ? 'border-amber-500 bg-amber-950/40 text-amber-300'
               : 'border-stone-700 text-stone-400 hover:text-white'
           }`}
-          title="Toggle framing safe area guides in setup"
+          title="Toggle framing safe area guides in setup (Never recorded)"
         >
           Guides
+        </button>
+
+        {/* Timer Visibility Toggle Button */}
+        <button
+          onClick={() =>
+            updatePresentationConfigProp(
+              'showRecordingTimer',
+              !presentationConfig.showRecordingTimer
+            )
+          }
+          className={`px-2.5 py-1 rounded-lg border text-[11px] flex items-center gap-1.5 transition ${
+            presentationConfig.showRecordingTimer
+              ? 'border-amber-500/80 bg-amber-950/40 text-amber-300 font-semibold'
+              : 'border-stone-700 text-stone-400 hover:text-white'
+          }`}
+          title="Toggle recording timer overlay (Default: Hide for 100% clean video)"
+        >
+          <Clock className="w-3.5 h-3.5" />
+          <span>Timer: {presentationConfig.showRecordingTimer ? 'Show' : 'Hide (Clean)'}</span>
+        </button>
+
+        {/* Control Visibility Quick Preset */}
+        <div className="flex items-center gap-1 bg-stone-800 rounded-lg p-0.5 text-[11px]">
+          <span className="text-stone-400 px-1 text-[10px]">Controls:</span>
+          {(['1s', '2s', '3s', '5s', 'always', 'never'] as ControlsVisibility[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => updatePresentationConfigProp('controlsVisibility', v)}
+              className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold transition ${
+                presentationConfig.controlsVisibility === v
+                  ? 'bg-amber-600 text-white'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+              title={`Auto-hide controls: ${v}`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+
+        {/* Mic Toggle */}
+        <button
+          onClick={() => setIncludeMic(!includeMic)}
+          className={`px-2 py-1 rounded-lg border text-[11px] flex items-center gap-1 transition ${
+            includeMic
+              ? 'border-emerald-500/60 bg-emerald-950/40 text-emerald-400'
+              : 'border-stone-700 text-stone-400 hover:text-white'
+          }`}
+          title="Toggle microphone recording"
+        >
+          {includeMic ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
+          <span>Mic {includeMic ? 'ON' : 'OFF'}</span>
         </button>
 
         <button
@@ -197,11 +275,13 @@ export const RecordingView: React.FC = () => {
         </button>
       </div>
 
-      {/* Live Unobtrusive Recording Status Indicator */}
-      {recorderState.isRecording && (
+      {/* Live Unobtrusive Recording Status Indicator (Only if explicitly enabled by user) */}
+      {recorderState.isRecording && presentationConfig.showRecordingTimer && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="fixed top-4 right-4 z-50 flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-red-950/90 border border-red-800/80 shadow-2xl backdrop-blur-md animate-in fade-in"
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-red-950/90 border border-red-800/80 shadow-2xl backdrop-blur-md animate-in fade-in transition-opacity duration-300 ${
+            areControlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
         >
           <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-record-pulse" />
           <span className="font-mono text-xs font-bold text-red-100">
@@ -217,7 +297,7 @@ export const RecordingView: React.FC = () => {
         </div>
       )}
 
-      {/* Fixed Presentation Canvas */}
+      {/* Fixed Presentation Canvas (Exact same as previous version) */}
       <div
         style={{
           ...canvasStyle,
@@ -283,7 +363,7 @@ export const RecordingView: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Bottom Recording Trigger Button */}
+      {/* Floating Bottom Start Recording Button (Visible before recording starts) */}
       {!recorderState.isRecording && (
         <div
           onClick={(e) => e.stopPropagation()}
@@ -312,58 +392,125 @@ export const RecordingView: React.FC = () => {
         </div>
       )}
 
-      {/* Recording Complete Modal */}
-      {showCompletionModal && (
+      {/* Bottom Floating Recording & Presentation Controls Bar (Active during recording) */}
+      {recorderState.isRecording && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in"
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 pointer-events-auto ${
+            areControlsVisible && presentationConfig.controlsVisibility !== 'never'
+              ? 'opacity-100 translate-y-0'
+              : 'opacity-0 translate-y-4 pointer-events-none'
+          }`}
         >
-          <div className="bg-stone-900 border border-stone-800 rounded-2xl max-w-md w-full p-6 text-center space-y-5 shadow-2xl">
-            <div className="w-14 h-14 rounded-full bg-red-950/80 border border-red-700 text-red-400 flex items-center justify-center mx-auto">
-              <Video className="w-7 h-7" />
+          <div className="flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 rounded-2xl bg-stone-900/90 dark:bg-stone-800/90 text-stone-100 shadow-2xl backdrop-blur-md border border-white/10 text-xs">
+            {/* Stop Recording Button */}
+            <button
+              onClick={handleStopRecording}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold shadow-md hover:scale-105 transition transform"
+              title="Stop Recording"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+              <span>Stop</span>
+            </button>
+
+            <div className="h-4 w-px bg-white/20 mx-1" />
+
+            {/* Previous Word */}
+            <button
+              onClick={prevWord}
+              className="p-2 hover:bg-white/15 rounded-xl transition text-stone-200 hover:text-white"
+              title="Previous Word (← / Right Click)"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {/* Auto Play / Pause */}
+            <button
+              onClick={togglePlayPause}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition shadow-sm ${
+                isPlaying && !isPaused
+                  ? 'bg-amber-500 text-stone-950 hover:bg-amber-400'
+                  : 'bg-white/15 hover:bg-white/25 text-white'
+              }`}
+              title="Toggle Auto Playback (Space)"
+            >
+              {isPlaying && !isPaused ? (
+                <>
+                  <Pause className="w-3.5 h-3.5 fill-current" />
+                  <span className="hidden sm:inline text-[11px]">Pause</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span className="hidden sm:inline text-[11px]">Auto</span>
+                </>
+              )}
+            </button>
+
+            {/* Next Word */}
+            <button
+              onClick={nextWord}
+              className="p-2 hover:bg-white/15 rounded-xl transition text-stone-200 hover:text-white"
+              title="Next Word (→ / Space / Left Click)"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            {/* Restart */}
+            <button
+              onClick={restart}
+              className="p-2 hover:bg-white/15 rounded-xl transition text-stone-200 hover:text-white"
+              title="Restart from beginning (Home)"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="h-4 w-px bg-white/20 mx-1" />
+
+            {/* Sentence Progress Indicator */}
+            <div className="px-2 font-mono font-bold text-[11px] text-stone-300">
+              {String(sentenceIndex + 1).padStart(2, '0')} / {String(sentences.length).padStart(2, '0')}
             </div>
 
-            <div className="space-y-1">
-              <h3 className="text-xl font-bold text-white">Recording Complete</h3>
-              <p className="text-xs text-stone-400">
-                Duration: {formatSeconds(recorderState.durationSeconds)} • Format: WebM (High Quality)
-              </p>
-            </div>
+            <div className="h-4 w-px bg-white/20 mx-1" />
 
-            {/* Video preview playback */}
-            {recorderState.blobUrl && (
-              <div className="rounded-xl overflow-hidden border border-stone-800 bg-black aspect-video">
-                <video src={recorderState.blobUrl} controls className="w-full h-full object-contain" />
-              </div>
-            )}
+            {/* Fullscreen Toggle */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 hover:bg-white/15 rounded-xl transition text-stone-200 hover:text-white"
+              title="Toggle Fullscreen (F)"
+            >
+              {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+            </button>
 
-            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
-              <button
-                onClick={handleDownloadVideo}
-                className="w-full sm:flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold text-xs shadow transition"
-              >
-                <Download className="w-4 h-4" />
-                <span>Download Recording</span>
-              </button>
-              <button
-                onClick={() => {
-                  setShowCompletionModal(false);
-                  handleStartRecording();
-                }}
-                className="w-full sm:w-auto px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl font-medium text-xs transition"
-              >
-                Record Again
-              </button>
-              <button
-                onClick={() => setShowCompletionModal(false)}
-                className="w-full sm:w-auto px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl font-medium text-xs transition"
-              >
-                Close
-              </button>
-            </div>
+            {/* Help */}
+            <button
+              onClick={() => setIsHelpOpen(true)}
+              className="p-2 hover:bg-white/15 rounded-xl transition text-stone-200 hover:text-white"
+              title="Keyboard Shortcuts (?)"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       )}
+
+      {/* Video Crop & MP4 Export Studio Modal (Preserved & Active) */}
+      <VideoCropModal
+        isOpen={showCropModal}
+        onClose={() => setShowCropModal(false)}
+        blobUrl={recorderState.blobUrl}
+        recordedBlob={recorderState.recordedBlob}
+        mimeType={recorderState.mimeType}
+        defaultTitle={`${currentChapter?.title || 'Lesson'}-${currentLesson?.title || ''}`}
+        onSendToAudioStudio={() => {
+          setView('audio');
+        }}
+        onRecordAgain={() => {
+          setShowCropModal(false);
+          handleStartRecording();
+        }}
+      />
     </div>
   );
 };

@@ -28,6 +28,37 @@ export const LessonSidebar: React.FC = () => {
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 270;
+    const saved = localStorage.getItem('pcjha_sidebar_width');
+    const parsed = saved ? parseInt(saved, 10) : 270;
+    return isNaN(parsed) || parsed < 180 || parsed > 450 ? 270 : parsed;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.min(420, Math.max(180, startWidth + delta));
+      setSidebarWidth(newWidth);
+      localStorage.setItem('pcjha_sidebar_width', String(newWidth));
+    };
+
+    const onMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
   if (!currentChapter) return null;
 
   const lessons = currentChapter.lessons || [];
@@ -49,7 +80,22 @@ export const LessonSidebar: React.FC = () => {
   };
 
   return (
-    <div className="w-64 sm:w-72 border-r border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900/60 flex flex-col h-full flex-shrink-0">
+    <div
+      style={{ width: `${sidebarWidth}px` }}
+      className="relative border-r border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900/60 flex flex-col h-full flex-shrink-0"
+    >
+      {/* Right Edge Drag Handle for Sidebar Resize */}
+      <div
+        onMouseDown={startResizing}
+        onDoubleClick={() => {
+          setSidebarWidth(270);
+          localStorage.setItem('pcjha_sidebar_width', '270');
+        }}
+        className={`hidden sm:block absolute right-0 top-0 bottom-0 w-1.5 hover:w-2 hover:bg-amber-500/80 cursor-col-resize z-20 transition-all ${
+          isResizing ? 'bg-amber-500 w-2' : 'bg-transparent'
+        }`}
+        title="Drag to resize sidebar width (Double click to reset to 270px)"
+      />
       {/* Sidebar Header */}
       <div className="p-3.5 border-b border-stone-200 dark:border-stone-800 space-y-2">
         <div className="flex items-center justify-between">

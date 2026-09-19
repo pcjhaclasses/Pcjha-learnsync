@@ -26,6 +26,40 @@ export const EditorLayout: React.FC = () => {
   // Mobile view switch between Editor and Preview
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
 
+  // Resizable Editor / Preview split on desktop (25% to 75%)
+  const workspaceRef = React.useRef<HTMLDivElement | null>(null);
+  const [splitPercent, setSplitPercent] = useState<number>(() => {
+    if (typeof window === 'undefined') return 52;
+    const saved = localStorage.getItem('pcjha_editor_split_percent');
+    const parsed = saved ? parseFloat(saved) : 52;
+    return isNaN(parsed) || parsed < 25 || parsed > 75 ? 52 : parsed;
+  });
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+
+  const startSplitDrag = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingSplit(true);
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!workspaceRef.current) return;
+      const rect = workspaceRef.current.getBoundingClientRect();
+      const relativeX = moveEvent.clientX - rect.left;
+      const pct = (relativeX / rect.width) * 100;
+      const clamped = Math.min(75, Math.max(25, pct));
+      setSplitPercent(clamped);
+      localStorage.setItem('pcjha_editor_split_percent', clamped.toFixed(1));
+    };
+
+    const onMouseUp = () => {
+      setIsDraggingSplit(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
   // Modals
   const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
@@ -67,10 +101,14 @@ export const EditorLayout: React.FC = () => {
       </div>
 
       {/* Main Two-Panel Content Workspace */}
-      <div className="flex-1 flex overflow-hidden">
+      <div ref={workspaceRef} className="flex-1 flex overflow-hidden relative">
         {/* LEFT PANEL: Editor & Content Management */}
         <div
-          className={`flex-1 flex flex-col min-w-0 h-full border-r border-stone-200 dark:border-stone-800 ${
+          style={{
+            flex: `0 0 ${splitPercent}%`,
+            maxWidth: `${splitPercent}%`,
+          }}
+          className={`flex-col min-w-0 h-full border-r border-stone-200 dark:border-stone-800 w-full lg:w-auto ${
             mobileTab === 'preview' ? 'hidden lg:flex' : 'flex'
           }`}
         >
@@ -146,9 +184,28 @@ export const EditorLayout: React.FC = () => {
           </div>
         </div>
 
+        {/* Desktop Draggable Horizontal Split Divider */}
+        <div
+          onMouseDown={startSplitDrag}
+          onDoubleClick={() => {
+            setSplitPercent(52);
+            localStorage.setItem('pcjha_editor_split_percent', '52');
+          }}
+          className={`hidden lg:flex w-2 hover:w-2.5 bg-stone-200/80 dark:bg-stone-800/80 hover:bg-amber-500 dark:hover:bg-amber-500 cursor-col-resize items-center justify-center transition-all z-20 select-none group flex-shrink-0 ${
+            isDraggingSplit ? 'bg-amber-500 w-2.5' : ''
+          }`}
+          title="Drag to resize Editor / Live Preview split (Double-click to reset to 50/50)"
+        >
+          <div className="w-0.5 h-8 rounded-full bg-stone-400 dark:bg-stone-600 group-hover:bg-white transition" />
+        </div>
+
         {/* RIGHT PANEL: Live Preview (Desktop Always Visible, Mobile via Tab) */}
         <div
-          className={`w-full lg:w-[460px] xl:w-[540px] 2xl:w-[600px] h-full flex-shrink-0 ${
+          style={{
+            flex: `0 0 ${100 - splitPercent}%`,
+            maxWidth: `${100 - splitPercent}%`,
+          }}
+          className={`h-full min-w-0 flex-shrink-0 w-full lg:w-auto ${
             mobileTab === 'editor' ? 'hidden lg:flex' : 'flex'
           }`}
         >

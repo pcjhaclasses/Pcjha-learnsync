@@ -10,7 +10,7 @@ interface WordHighlightLayerProps {
 }
 
 export const WordHighlightLayer: React.FC<WordHighlightLayerProps> = ({ layer, text }) => {
-  const { activeLayer, wordIndex, presentationConfig } = usePresentation();
+  const { activeLayer, wordIndex, presentationConfig, focusWord } = usePresentation();
   const { theme, typography } = useTheme();
 
   const tokens: WordToken[] = tokenizeText(text);
@@ -65,8 +65,12 @@ export const WordHighlightLayer: React.FC<WordHighlightLayerProps> = ({ layer, t
       padding: `${theme.highlightPaddingY}px ${theme.highlightPaddingX}px`,
       borderRadius: `${theme.highlightBorderRadius}px`,
       opacity: wordOpacity,
-      transition: 'all 0.16s ease-out',
+      transition: 'all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)',
       color: defaultTextColor,
+      position: 'relative',
+      transform: isWordActive ? 'scale(1.14) translateY(-2px)' : 'scale(1) translateY(0)',
+      zIndex: isWordActive ? 10 : 1,
+      cursor: 'pointer',
     };
 
     if (isWordActive) {
@@ -78,7 +82,7 @@ export const WordHighlightLayer: React.FC<WordHighlightLayerProps> = ({ layer, t
             backgroundColor: hexToRgba(theme.highlightBg, theme.highlightOpacity),
             color: theme.highlightText,
             fontWeight: Math.min(800, typo.fontWeight + 100),
-            boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
           };
           break;
         case 'pill':
@@ -88,7 +92,7 @@ export const WordHighlightLayer: React.FC<WordHighlightLayerProps> = ({ layer, t
             color: theme.highlightText,
             borderRadius: '9999px',
             fontWeight: Math.min(800, typo.fontWeight + 100),
-            boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+            boxShadow: '0 4px 18px rgba(0,0,0,0.15)',
           };
           break;
         case 'underline':
@@ -98,6 +102,7 @@ export const WordHighlightLayer: React.FC<WordHighlightLayerProps> = ({ layer, t
             color: theme.highlightText || defaultTextColor,
             fontWeight: Math.min(800, typo.fontWeight + 100),
             borderRadius: 0,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           };
           break;
         case 'glow':
@@ -105,7 +110,7 @@ export const WordHighlightLayer: React.FC<WordHighlightLayerProps> = ({ layer, t
             ...wordStyle,
             backgroundColor: hexToRgba(theme.highlightBg, 0.25),
             color: theme.highlightText,
-            boxShadow: `0 0 16px ${hexToRgba(theme.highlightBg, 0.75)}`,
+            boxShadow: `0 0 20px ${hexToRgba(theme.highlightBg, 0.85)}`,
             fontWeight: Math.min(800, typo.fontWeight + 100),
           };
           break;
@@ -114,7 +119,7 @@ export const WordHighlightLayer: React.FC<WordHighlightLayerProps> = ({ layer, t
             ...wordStyle,
             color: theme.highlightText,
             fontWeight: 800,
-            transform: 'scale(1.05)',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
           };
           break;
         case 'textColor':
@@ -122,6 +127,7 @@ export const WordHighlightLayer: React.FC<WordHighlightLayerProps> = ({ layer, t
             ...wordStyle,
             color: theme.highlightText,
             fontWeight: Math.min(800, typo.fontWeight + 100),
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           };
           break;
       }
@@ -136,7 +142,14 @@ export const WordHighlightLayer: React.FC<WordHighlightLayerProps> = ({ layer, t
         key={token.id}
         style={wordStyle}
         data-index={token.index}
-        className="word-token select-none cursor-default font-feature-settings"
+        onClick={(e) => {
+          e.stopPropagation();
+          focusWord(layer, token.index);
+        }}
+        role="button"
+        tabIndex={0}
+        title={`Focus word: ${token.text}`}
+        className="word-token select-none font-feature-settings hover:opacity-95"
       >
         {token.text}
       </span>

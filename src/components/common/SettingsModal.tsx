@@ -66,38 +66,73 @@ export const SettingsModal: React.FC = () => {
   const [customThemeName, setCustomThemeName] = useState('');
 
   // Custom timing builder helpers
-  const [customTimingValue, setCustomTimingValue] = useState<number>(1);
-  const [customTimingUnit, setCustomTimingUnit] = useState<'ms' | 'sec' | 'min' | 'hr'>('sec');
+  const [customTimingValue, setCustomTimingValue] = useState<string>('750');
+  const [customTimingUnit, setCustomTimingUnit] = useState<'milliseconds' | 'seconds' | 'minutes' | 'hours'>('milliseconds');
 
   if (!isSettingsOpen) return null;
 
   const TIMING_PRESETS = [
+    // Milliseconds
+    { label: '1 ms', ms: 1 },
+    { label: '5 ms', ms: 5 },
+    { label: '10 ms', ms: 10 },
+    { label: '25 ms', ms: 25 },
+    { label: '50 ms', ms: 50 },
+    { label: '75 ms', ms: 75 },
     { label: '100 ms', ms: 100 },
     { label: '250 ms', ms: 250 },
     { label: '500 ms', ms: 500 },
     { label: '750 ms', ms: 750 },
+    // Seconds
     { label: '1 sec', ms: 1000 },
     { label: '1.5 sec', ms: 1500 },
     { label: '2 sec', ms: 2000 },
-    { label: '3 sec', ms: 3000 },
     { label: '5 sec', ms: 5000 },
     { label: '10 sec', ms: 10000 },
     { label: '30 sec', ms: 30000 },
+    { label: '60 sec', ms: 60000 },
+    // Minutes & Hours
     { label: '1 min', ms: 60000 },
+    { label: '2 min', ms: 120000 },
     { label: '5 min', ms: 300000 },
     { label: '10 min', ms: 600000 },
+    { label: '15 min', ms: 900000 },
     { label: '30 min', ms: 1800000 },
-    { label: '1 hr', ms: 3600000 },
+    { label: '60 min', ms: 3600000 },
+    { label: '1 hour', ms: 3600000 },
   ];
 
-  const applyCustomTiming = () => {
-    let multiplier = 1;
-    if (customTimingUnit === 'ms') multiplier = 1;
-    if (customTimingUnit === 'sec') multiplier = 1000;
-    if (customTimingUnit === 'min') multiplier = 60000;
-    if (customTimingUnit === 'hr') multiplier = 3600000;
+  const formatTimingDisplay = (ms: number): string => {
+    if (!ms || ms <= 0) return '0 ms';
+    if (ms >= 3600000 && ms % 3600000 === 0) {
+      const h = ms / 3600000;
+      return `${h} ${h === 1 ? 'hour' : 'hours'}`;
+    }
+    if (ms >= 60000 && ms % 60000 === 0) {
+      const m = ms / 60000;
+      return `${m} min`;
+    }
+    if (ms >= 1000) {
+      const s = Number((ms / 1000).toFixed(2));
+      return `${s} sec`;
+    }
+    return `${ms} ms`;
+  };
 
-    const finalMs = Math.max(50, customTimingValue * multiplier);
+  const applyCustomTiming = () => {
+    const val = parseFloat(customTimingValue);
+    if (isNaN(val) || val <= 0 || !isFinite(val)) {
+      alert('Please enter a valid positive numeric timing value.');
+      return;
+    }
+
+    let multiplier = 1;
+    if (customTimingUnit === 'milliseconds') multiplier = 1;
+    if (customTimingUnit === 'seconds') multiplier = 1000;
+    if (customTimingUnit === 'minutes') multiplier = 60000;
+    if (customTimingUnit === 'hours') multiplier = 3600000;
+
+    const finalMs = Math.max(1, Math.round(val * multiplier));
     updateTimingProp('wordIntervalMs', finalMs);
   };
 
@@ -475,18 +510,18 @@ export const SettingsModal: React.FC = () => {
 
                 <div>
                   <h3 className="text-sm font-bold">Word Highlighting Interval</h3>
-                  <p className="text-stone-500 mb-3">
-                    Currently selected: <strong className="text-amber-600">{timing.wordIntervalMs >= 1000 ? `${timing.wordIntervalMs / 1000}s` : `${timing.wordIntervalMs}ms`}</strong>
+                  <p className="text-stone-500 mb-3 text-xs">
+                    Currently selected delay: <strong className="text-amber-600 font-mono text-sm">{formatTimingDisplay(timing.wordIntervalMs)} ({timing.wordIntervalMs} ms)</strong>
                   </p>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                     {TIMING_PRESETS.map((preset) => (
                       <button
                         key={preset.label}
                         onClick={() => updateTimingProp('wordIntervalMs', preset.ms)}
-                        className={`p-2 rounded-lg border text-center font-medium transition ${
+                        className={`p-2 rounded-lg border text-center text-xs font-medium transition ${
                           timing.wordIntervalMs === preset.ms
-                            ? 'bg-amber-600 text-white border-amber-600 font-bold'
-                            : 'border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800'
+                            ? 'bg-amber-600 text-white border-amber-600 font-bold shadow-xs'
+                            : 'border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
                         }`}
                       >
                         {preset.label}
@@ -495,33 +530,46 @@ export const SettingsModal: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2">
-                  <h4 className="font-semibold text-stone-700 dark:text-stone-300">Custom Word Interval</h4>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      value={customTimingValue}
-                      onChange={(e) => setCustomTimingValue(Math.max(1, Number(e.target.value)))}
-                      className="w-24 px-2 py-1 rounded border border-stone-300 dark:border-stone-700 dark:bg-stone-800"
-                    />
-                    <select
-                      value={customTimingUnit}
-                      onChange={(e) => setCustomTimingUnit(e.target.value as any)}
-                      className="px-2.5 py-1 rounded border border-stone-300 dark:border-stone-700 dark:bg-stone-800"
-                    >
-                      <option value="ms">milliseconds</option>
-                      <option value="sec">seconds</option>
-                      <option value="min">minutes</option>
-                      <option value="hr">hours</option>
-                    </select>
+                <div className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/40 dark:bg-stone-900/40 space-y-2.5">
+                  <h4 className="font-semibold text-xs text-stone-700 dark:text-stone-300">
+                    Custom Word Interval (Numeric Value + Unit)
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-stone-400">Value:</span>
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="any"
+                        value={customTimingValue}
+                        onChange={(e) => setCustomTimingValue(e.target.value)}
+                        placeholder="e.g. 750, 1.5, 2"
+                        className="w-28 px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 dark:bg-stone-800 text-xs text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-stone-400">Unit:</span>
+                      <select
+                        value={customTimingUnit}
+                        onChange={(e) => setCustomTimingUnit(e.target.value as any)}
+                        className="px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 dark:bg-stone-800 text-xs text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      >
+                        <option value="milliseconds">milliseconds (ms)</option>
+                        <option value="seconds">seconds (sec)</option>
+                        <option value="minutes">minutes (min)</option>
+                        <option value="hours">hours (hr)</option>
+                      </select>
+                    </div>
                     <button
                       onClick={applyCustomTiming}
-                      className="px-3 py-1 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded font-medium hover:bg-stone-800 transition"
+                      className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold text-xs shadow-xs transition"
                     >
                       Set Interval
                     </button>
                   </div>
+                  <p className="text-[10px] text-stone-400 leading-relaxed pt-1">
+                    * Browser Timer Precision Notice: Standard browser event loops schedule timers at ~4ms-10ms practical resolution. Very small intervals (e.g. 1ms, 5ms) are accepted and execute at the fastest available browser scheduling.
+                  </p>
                 </div>
 
                 <div>
@@ -1108,23 +1156,60 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'controls' && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-sm font-bold">Controls Auto-Hide Inactivity Timer</h3>
-                  <p className="text-stone-500 mb-3">Controls automatically fade out after mouse stops moving</p>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {(['always', '1s', '2s', '3s', '5s', 'never'] as ControlsVisibility[]).map((v) => (
+                  <h3 className="text-sm font-bold">Control Visibility (Presentation & Recording)</h3>
+                  <p className="text-stone-500 mb-3">Controls automatically fade out after mouse stops moving, reappearing on mouse movement</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      { key: 'always', label: 'Always visible' },
+                      { key: '1s', label: 'Auto-hide (1s)' },
+                      { key: '2s', label: 'Auto-hide (2s)' },
+                      { key: '3s', label: 'Auto-hide (3s)' },
+                      { key: '5s', label: 'Auto-hide (5s)' },
+                      { key: 'never', label: 'Never show' },
+                    ].map((item) => (
                       <button
-                        key={v}
-                        onClick={() => updatePresentationConfigProp('controlsVisibility', v)}
-                        className={`p-2 rounded-lg border text-center font-medium capitalize transition ${
-                          presentationConfig.controlsVisibility === v
-                            ? 'bg-amber-600 text-white border-amber-600 font-bold'
-                            : 'border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800'
+                        key={item.key}
+                        onClick={() => updatePresentationConfigProp('controlsVisibility', item.key as ControlsVisibility)}
+                        className={`p-2.5 rounded-xl border text-center text-xs font-semibold transition ${
+                          presentationConfig.controlsVisibility === item.key
+                            ? 'bg-amber-600 text-white border-amber-600 font-bold shadow-xs'
+                            : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
                         }`}
                       >
-                        {v}
+                        {item.label}
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-bold">Recording Timer Visibility</h3>
+                  <p className="text-stone-500 mb-2">Display duration timer badge over the recording canvas</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => updatePresentationConfigProp('showRecordingTimer', false)}
+                      className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition ${
+                        !presentationConfig.showRecordingTimer
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'border-stone-200 dark:border-stone-700 text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+                      }`}
+                    >
+                      Hide Timer (Default — Clean Video)
+                    </button>
+                    <button
+                      onClick={() => updatePresentationConfigProp('showRecordingTimer', true)}
+                      className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition ${
+                        presentationConfig.showRecordingTimer
+                          ? 'bg-amber-600 text-white border-amber-600'
+                          : 'border-stone-200 dark:border-stone-700 text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+                      }`}
+                    >
+                      Show Timer (Application UI)
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-1.5">
+                    Recommended: Keep Hidden so your exported video contains only the pure presentation content without technical timing badges.
+                  </p>
                 </div>
 
                 <div>

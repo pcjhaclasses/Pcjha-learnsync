@@ -8,9 +8,11 @@ import {
   StickyNote,
   AlertCircle,
   Info,
+  ClipboardPaste,
 } from 'lucide-react';
 import { useApp } from '../../state/AppContext';
 import { countWords } from '../../services/tokenizer';
+import { PasteImportModal } from './PasteImportModal';
 
 export const SentenceList: React.FC = () => {
   const {
@@ -23,6 +25,8 @@ export const SentenceList: React.FC = () => {
   } = useApp();
 
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
+  // undefined = closed, null = lesson mode, string = target sentence id
+  const [pasteTargetId, setPasteTargetId] = useState<string | null | undefined>(undefined);
 
   if (!currentLesson) {
     return (
@@ -40,20 +44,30 @@ export const SentenceList: React.FC = () => {
 
   return (
     <div className="space-y-4 p-4 sm:p-6 pb-20">
-      {/* Top summary count & Add button */}
+      {/* Top summary count & Add / Paste buttons */}
       <div className="flex items-center justify-between pb-2 border-b border-stone-200 dark:border-stone-800">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
             {sentences.length} {sentences.length === 1 ? 'Sentence' : 'Sentences'} in this lesson
           </span>
         </div>
-        <button
-          onClick={() => addSentence(currentLesson.id)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-xl shadow-xs transition"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Sentence</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPasteTargetId(null)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 font-semibold text-xs rounded-xl border border-stone-200 dark:border-stone-700 transition"
+            title="Paste 3 lines per sentence (Hindi, Pronunciation, English)"
+          >
+            <ClipboardPaste className="w-3.5 h-3.5 text-amber-600" />
+            <span>Paste 3 Lines</span>
+          </button>
+          <button
+            onClick={() => addSentence(currentLesson.id)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-xl shadow-xs transition"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Sentence</span>
+          </button>
+        </div>
       </div>
 
       {sentences.length === 0 ? (
@@ -116,6 +130,14 @@ export const SentenceList: React.FC = () => {
 
                 {/* Card Action Buttons */}
                 <div className="flex items-center gap-1 text-stone-400">
+                  <button
+                    onClick={() => setPasteTargetId(sent.id)}
+                    className="p-1.5 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-200/60 dark:hover:bg-stone-700 rounded transition flex items-center gap-1 text-[11px] text-amber-600 font-medium"
+                    title="Paste 3 Lines into this sentence (Hindi, Pronunciation, English)"
+                  >
+                    <ClipboardPaste className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Paste 3 Lines</span>
+                  </button>
                   <button
                     onClick={() => toggleNote(sent.id)}
                     className={`p-1.5 rounded hover:bg-stone-200/60 dark:hover:bg-stone-700 transition ${
@@ -270,16 +292,32 @@ export const SentenceList: React.FC = () => {
         })
       )}
 
-      {/* Bottom Add button */}
+      {/* Bottom Add & Paste buttons */}
       {sentences.length > 0 && (
-        <button
-          onClick={() => addSentence(currentLesson.id)}
-          className="w-full py-3 border-2 border-dashed border-stone-200 dark:border-stone-800 hover:border-amber-500 dark:hover:border-amber-500 rounded-2xl flex items-center justify-center gap-2 text-stone-600 dark:text-stone-400 hover:text-amber-600 font-semibold text-xs transition"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Sentence</span>
-        </button>
+        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+          <button
+            onClick={() => setPasteTargetId(null)}
+            className="w-full sm:flex-1 py-3 border-2 border-dashed border-stone-200 dark:border-stone-800 hover:border-amber-500 dark:hover:border-amber-500 rounded-2xl flex items-center justify-center gap-2 text-stone-600 dark:text-stone-400 hover:text-amber-600 font-semibold text-xs transition"
+          >
+            <ClipboardPaste className="w-4 h-4 text-amber-600" />
+            <span>Paste 3 Lines</span>
+          </button>
+          <button
+            onClick={() => addSentence(currentLesson.id)}
+            className="w-full sm:flex-1 py-3 border-2 border-dashed border-stone-200 dark:border-stone-800 hover:border-amber-500 dark:hover:border-amber-500 rounded-2xl flex items-center justify-center gap-2 text-stone-600 dark:text-stone-400 hover:text-amber-600 font-semibold text-xs transition"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Sentence</span>
+          </button>
+        </div>
       )}
+
+      {/* Paste Import Modal (Supports single-sentence and multi-sentence paste) */}
+      <PasteImportModal
+        isOpen={pasteTargetId !== undefined}
+        onClose={() => setPasteTargetId(undefined)}
+        targetSentenceId={pasteTargetId}
+      />
     </div>
   );
 };

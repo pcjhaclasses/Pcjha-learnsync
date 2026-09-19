@@ -1,55 +1,96 @@
 import type { Chapter, Lesson, Sentence, ThemeConfig, TypographyConfig } from '../types';
 
+export interface PasteParseResult {
+  sentences: Omit<Sentence, 'id'>[];
+  completeCount: number;
+  incompleteGroups: string[][];
+  warning: string | null;
+}
+
 /**
- * Parses paste content where groups of 3 non-empty lines represent:
- * Line 1: Hindi
- * Line 2: Hindi Pronunciation (in Devanagari)
- * Line 3: English
- * Blank lines separate sentence groups.
+ * Robust paste analyzer supporting:
+ * - Line 1: Hindi
+ * - Line 2: Hindi Pronunciation (in Devanagari script, never transliterated)
+ * - Line 3: English
+ * - Blank lines separating groups
+ * - Complete and incomplete validation with actionable warnings
  */
-export function parsePasteSentences(text: string): Omit<Sentence, 'id'>[] {
-  const lines = text.split(/\r?\n/);
-  const result: Omit<Sentence, 'id'>[] = [];
+export function analyzePasteContent(text: string): PasteParseResult {
+  if (!text || !text.trim()) {
+    return {
+      sentences: [],
+      completeCount: 0,
+      incompleteGroups: [],
+      warning: null,
+    };
+  }
 
-  let currentGroup: string[] = [];
+  const rawLines = text.split(/\r?\n/).map((l) => l.trim());
+  const rawGroups: string[][] = [];
+  let currentBlock: string[] = [];
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed === '') {
-      if (currentGroup.length >= 3) {
-        result.push({
-          hindi: currentGroup[0],
-          pronunciation: currentGroup[1],
-          english: currentGroup[2],
-          note: currentGroup.slice(3).join('\n') || undefined,
-        });
-        currentGroup = [];
+  for (const line of rawLines) {
+    if (line === '') {
+      if (currentBlock.length > 0) {
+        rawGroups.push(currentBlock);
+        currentBlock = [];
       }
     } else {
-      currentGroup.push(trimmed);
-      if (currentGroup.length === 3) {
-        // We have the 3 required layers
-        result.push({
-          hindi: currentGroup[0],
-          pronunciation: currentGroup[1],
-          english: currentGroup[2],
-        });
-        currentGroup = [];
+      currentBlock.push(line);
+    }
+  }
+  if (currentBlock.length > 0) {
+    rawGroups.push(currentBlock);
+  }
+
+  const processedGroups: string[][] = [];
+
+  for (const group of rawGroups) {
+    if (group.length > 3 && group.length % 3 === 0) {
+      for (let i = 0; i < group.length; i += 3) {
+        processedGroups.push(group.slice(i, i + 3));
       }
+    } else {
+      processedGroups.push(group);
     }
   }
 
-  // Handle any trailing group
-  if (currentGroup.length >= 3) {
-    result.push({
-      hindi: currentGroup[0],
-      pronunciation: currentGroup[1],
-      english: currentGroup[2],
-      note: currentGroup.slice(3).join('\n') || undefined,
-    });
+  const sentences: Omit<Sentence, 'id'>[] = [];
+  const incompleteGroups: string[][] = [];
+
+  for (const grp of processedGroups) {
+    if (grp.length >= 3) {
+      sentences.push({
+        hindi: grp[0],
+        pronunciation: grp[1],
+        english: grp[2],
+        note: grp.length > 3 ? grp.slice(3).join('\n') : undefined,
+      });
+    } else if (grp.length > 0) {
+      incompleteGroups.push(grp);
+    }
   }
 
-  return result;
+  let warning: string | null = null;
+  if (incompleteGroups.length > 0) {
+    const completeText = `${sentences.length} complete sentence${sentences.length === 1 ? '' : 's'} detected.`;
+    const incompleteText = `${incompleteGroups.length} incomplete group${incompleteGroups.length === 1 ? '' : 's'} needs review.`;
+    warning = `${completeText} ${incompleteText}`;
+  }
+
+  return {
+    sentences,
+    completeCount: sentences.length,
+    incompleteGroups,
+    warning,
+  };
+}
+
+/**
+ * Backward-compatible parsePasteSentences export
+ */
+export function parsePasteSentences(text: string): Omit<Sentence, 'id'>[] {
+  return analyzePasteContent(text).sentences;
 }
 
 /**

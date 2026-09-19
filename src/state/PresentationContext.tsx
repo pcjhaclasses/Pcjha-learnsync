@@ -32,6 +32,7 @@ export const DEFAULT_PRESENTATION_CONFIG: PresentationConfig = {
   showPercent: true,
   showIntroCover: false,
   showCompletionScreen: true,
+  showRecordingTimer: false,
   showControlButtons: {
     prev: true,
     next: true,
@@ -68,6 +69,7 @@ interface PresentationContextType {
   startPresentation: () => void;
   nextWord: () => void;
   prevWord: () => void;
+  focusWord: (layer: 'hindi' | 'pronunciation' | 'english', index: number) => void;
   nextSentence: () => void;
   prevSentence: () => void;
   goToSentence: (index: number) => void;
@@ -91,7 +93,7 @@ interface PresentationContextType {
 const PresentationContext = createContext<PresentationContextType | undefined>(undefined);
 
 export const PresentationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentLesson, view } = useApp();
+  const { currentLesson, view, setView } = useApp();
 
   const [timing, setTimingState] = useState<TimingSettings>(() =>
     StorageService.loadTiming(DEFAULT_TIMING)
@@ -354,6 +356,12 @@ export const PresentationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsCompleted(false);
   }, []);
 
+  const focusWord = useCallback((layer: 'hindi' | 'pronunciation' | 'english', index: number) => {
+    setActiveLayer(layer);
+    setWordIndex(index);
+    setIsCompleted(false);
+  }, []);
+
   // Play / Pause Controls
   const play = useCallback(() => {
     setIsPlaying(true);
@@ -436,8 +444,8 @@ export const PresentationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       };
     }
 
-    // Normal word tick
-    const interval = Math.max(50, timing.wordIntervalMs);
+    // Normal word tick (supports intervals from 1ms up to hours)
+    const interval = Math.max(1, Math.round(timing.wordIntervalMs || 1000));
 
     playbackTimerRef.current = window.setTimeout(() => {
       // First tick if at -1
@@ -613,6 +621,11 @@ export const PresentationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             document.exitFullscreen().catch(() => {});
           }
           break;
+        case 'r':
+        case 'R':
+          e.preventDefault();
+          setView(view === 'recording' ? 'presentation' : 'recording');
+          break;
         case '?':
           e.preventDefault();
           setIsHelpOpen(true);
@@ -624,6 +637,7 @@ export const PresentationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     view,
+    setView,
     timing.useAutoTiming,
     nextWord,
     prevWord,
@@ -658,6 +672,7 @@ export const PresentationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         startPresentation,
         nextWord,
         prevWord,
+        focusWord,
         nextSentence,
         prevSentence,
         goToSentence,

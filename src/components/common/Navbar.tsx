@@ -11,9 +11,14 @@ import {
   CheckCircle2,
   Search,
   AlertTriangle,
+  Music,
+  FileSpreadsheet,
+  GraduationCap,
+  Database,
 } from 'lucide-react';
 import { useApp } from '../../state/AppContext';
 import { usePresentation } from '../../state/PresentationContext';
+import { BackupModal } from './BackupModal';
 
 export const Navbar: React.FC = () => {
   const {
@@ -39,6 +44,7 @@ export const Navbar: React.FC = () => {
 
   const { setIsHelpOpen, setIsSettingsOpen, startPresentation } = usePresentation();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isBackupOpen, setIsBackupOpen] = useState(false);
 
   const handleStartPresenting = () => {
     startPresentation();
@@ -243,7 +249,55 @@ export const Navbar: React.FC = () => {
               <Video className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Record</span>
             </button>
+
+            <button
+              onClick={() => setView('audio')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition ${
+                view === 'audio' || view === 'audioStudio'
+                  ? 'bg-amber-600 text-white shadow-xs font-semibold'
+                  : 'text-stone-600 dark:text-stone-300 hover:text-stone-900'
+              }`}
+              title="Audio Recording & Word Timing Studio"
+            >
+              <Music className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Audio</span>
+            </button>
+
+            <button
+              onClick={() => setView('import')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition ${
+                view === 'import' || view === 'importCenter'
+                  ? 'bg-amber-600 text-white shadow-xs font-semibold'
+                  : 'text-stone-600 dark:text-stone-300 hover:text-stone-900'
+              }`}
+              title="Import from CSV, Paste, or Word DOCX"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Import</span>
+            </button>
+
+            <button
+              onClick={() => setView('learning')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition ${
+                view === 'learning' || view === 'reader'
+                  ? 'bg-emerald-600 text-white shadow-xs font-semibold'
+                  : 'text-stone-600 dark:text-stone-300 hover:text-stone-900'
+              }`}
+              title="Student Reader, Listen, Vocab & Quiz"
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Learn</span>
+            </button>
           </nav>
+
+          {/* Project Backup & Storage */}
+          <button
+            onClick={() => setIsBackupOpen(true)}
+            className="p-2 text-stone-600 dark:text-stone-300 hover:text-amber-500 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition"
+            title="Project Backup & Storage Quota (.zip)"
+          >
+            <Database className="w-4 h-4" />
+          </button>
 
           {/* Quick Settings & Help */}
           <button
@@ -281,6 +335,9 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Full Project Backup & Storage Modal */}
+      <BackupModal isOpen={isBackupOpen} onClose={() => setIsBackupOpen(false)} />
     </header>
   );
 };
